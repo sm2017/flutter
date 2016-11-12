@@ -2262,6 +2262,62 @@ class Expanded extends Flexible {
   }) : super(key: key, flex: flex, fit: FlexFit.tight, child: child);
 }
 
+class Wrap extends MultiChildRenderObjectWidget {
+  Wrap({
+    Key key,
+    this.direction: WrapDirection.leftThenDown,
+    this.primaryAlignment: WrapAlignment.center,
+    this.primarySpacing: 0.0,
+    this.secondaryAlignment: WrapCrossAlignment.center,
+    this.tertiaryAlignment: WrapAlignment.center,
+    this.tertiarySpacing: 0.0,
+    List<Widget> children: const <Widget>[],
+  }) : super(key: key, children: children) {
+    assert(direction != null);
+    assert(primaryAlignment != null);
+    assert(primarySpacing != null);
+    assert(secondaryAlignment != null);
+    assert(tertiaryAlignment != null);
+    assert(tertiarySpacing != null);
+  }
+
+  final WrapDirection direction;
+
+  final WrapAlignment primaryAlignment;
+
+  final double primarySpacing;
+
+  final WrapCrossAlignment secondaryAlignment;
+
+  final WrapAlignment tertiaryAlignment;
+
+  final double tertiarySpacing;
+
+  @override
+  RenderWrap createRenderObject(BuildContext context) {
+    return new RenderWrap(
+      direction: direction,
+      primaryAlignment: primaryAlignment,
+      primarySpacing: primarySpacing,
+      secondaryAlignment: secondaryAlignment,
+      tertiaryAlignment: tertiaryAlignment,
+      tertiarySpacing: tertiarySpacing,
+    );
+  }
+
+  @override
+  void updateRenderObject(BuildContext context, RenderWrap renderObject) {
+    renderObject
+      ..direction = direction
+      ..primaryAlignment = primaryAlignment
+      ..primarySpacing = primarySpacing
+      ..secondaryAlignment = secondaryAlignment
+      ..tertiaryAlignment = tertiaryAlignment
+      ..tertiarySpacing = tertiarySpacing;
+  }
+}
+
+
 /// A widget that implements the flow layout algorithm.
 ///
 /// Flow layouts are optimized for repositioning children using transformation
