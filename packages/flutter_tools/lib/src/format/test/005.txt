@@ -1,0 +1,8 @@
+Car getACar() { var car = new Car()..plate = 111; return car != null ? car : new Car()..plate = 222; }
+
+Car getACar() {
+  var car = new Car()..plate = 111;
+  return car != null
+    ? car
+    : new Car()..plate = 222;
+}

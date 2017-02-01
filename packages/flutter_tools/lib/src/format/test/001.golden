@@ -1,0 +1,3 @@
+void main() {
+  tokens.add(_tokenizer.terminate());
+}

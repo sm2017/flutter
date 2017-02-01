@@ -1,0 +1,6 @@
+dynamic foo() {
+  return bar
+    ..a = b
+    ..c = d
+    ..e = f;
+}

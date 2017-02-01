@@ -1,0 +1,17 @@
+class foo {
+  foo(dynamic this.bar());
+
+  dynamic bar;
+}
+
+class baz {
+  void foo(dynamic x) { }
+
+  void bar() { }
+
+  void test() {
+    foo(this.bar());
+  }
+}
+
+void main() { }

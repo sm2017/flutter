@@ -6,40 +6,48 @@ import 'dart:async';
 
 import '../base/common.dart';
 import '../base/file_system.dart';
-import '../base/process.dart';
-import '../cache.dart';
+import '../format/format.dart' as formatter;
 import '../runner/flutter_command.dart';
 
 class FormatCommand extends FlutterCommand {
+  FormatCommand() {
+    argParser.addFlag('verify',
+        defaultsTo: false,
+        negatable: false,
+        hide: true,
+        help: 'Verifies that the one file provided formats to the same exact '
+              'contents as the file with the same name in the same directory '
+              'but with its extension replaced with "golden".'
+    );
+  }
+
   @override
   final String name = 'format';
 
   @override
-  List<String> get aliases => const <String>['dartfmt'];
+  final String description = 'Reformat a dart file and output the results to the console.';
 
   @override
-  final String description = 'Format one or more dart files.';
-
-  @override
-  String get invocation => "${runner.executableName} $name <one or more paths>";
+  String get invocation => "${runner.executableName} $name <filename>";
 
   @override
   Future<Null> runCommand() async {
     if (argResults.rest.isEmpty) {
       throwToolExit(
-        'No files specified to be formatted.\n'
-        '\n'
-        'To format all files in the current directory tree:\n'
-        '${runner.executableName} $name .\n'
+        'No file specified to be formatted.\n'
         '\n'
         '$usage'
       );
     }
 
-    final String dartfmt = fs.path.join(Cache.flutterRoot, 'bin', 'cache', 'dart-sdk', 'bin', 'dartfmt');
-    final List<String> cmd = <String>[dartfmt, '-w']..addAll(argResults.rest);
-    final int result = await runCommandAndStreamOutput(cmd);
-    if (result != 0)
-      throwToolExit('Formatting failed: $result', exitCode: result);
+    if (argResults.rest.length > 1) {
+      throwToolExit(
+        'Multiple files specified to be formatted. Currently only one file may be specified at a time.\n'
+        '\n'
+        '$usage'
+      );
+    }
+
+    print(await formatter.reformat(fs.file(argResults.rest.single), verify: argResults['verify']));
   }
 }
