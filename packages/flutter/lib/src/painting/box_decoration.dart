@@ -79,7 +79,7 @@ class BoxDecoration extends Decoration {
     this.boxShadow,
     this.gradient,
     this.shape: BoxShape.rectangle,
-  });
+  }) : assert(shape != null);
 
   @override
   bool debugAssertIsValid() {
@@ -117,7 +117,6 @@ class BoxDecoration extends Decoration {
   /// The shape to fill the background [color] into and to cast as the [boxShadow].
   final BoxShape shape;
 
-  /// The inset space occupied by the border.
   @override
   EdgeInsets get padding => border?.dimensions;
 
@@ -138,11 +137,31 @@ class BoxDecoration extends Decoration {
   @override
   bool get isComplex => boxShadow != null;
 
+  @override
+  BoxDecoration lerpFrom(Decoration a, double t) {
+    if (a == null || a is BoxDecoration)
+      return BoxDecoration.lerp(a, this, t);
+    return super.lerpFrom(a, t);
+  }
+
+  @override
+  BoxDecoration lerpTo(Decoration b, double t) {
+    if (b == null || b is BoxDecoration)
+      return BoxDecoration.lerp(this, b, t);
+    return super.lerpTo(b, t);
+  }
+
   /// Linearly interpolate between two box decorations.
   ///
   /// Interpolates each parameter of the box decoration separately.
   ///
-  /// See also [Decoration.lerp].
+  /// See also:
+  ///
+  ///  * [Decoration.lerp], which can interpolate between any two types of
+  ///    [Decoration]s, not just [BoxDecoration]s.
+  ///  * [lerpFrom] and [lerpTo], which are used to implement [Decoration.lerp]
+  ///     and which use [BoxDecoration.lerp] when interpolating two
+  ///    [BoxDecoration]s or a [BoxDecoration] to or from null.
   static BoxDecoration lerp(BoxDecoration a, BoxDecoration b, double t) {
     if (a == null && b == null)
       return null;
@@ -153,27 +172,13 @@ class BoxDecoration extends Decoration {
     // TODO(abarth): lerp ALL the fields.
     return new BoxDecoration(
       color: Color.lerp(a.color, b.color, t),
-      image: b.image,
+      image: t < 0.5 ? a.image : b.image,
       border: Border.lerp(a.border, b.border, t),
       borderRadius: BorderRadius.lerp(a.borderRadius, b.borderRadius, t),
       boxShadow: BoxShadow.lerpList(a.boxShadow, b.boxShadow, t),
-      gradient: b.gradient,
-      shape: b.shape,
+      gradient: t < 0.5 ? a.gradient : b.gradient,
+      shape: t < 0.5 ? a.shape : b.shape,
     );
-  }
-
-  @override
-  BoxDecoration lerpFrom(Decoration a, double t) {
-    if (a is! BoxDecoration)
-      return BoxDecoration.lerp(null, this, t);
-    return BoxDecoration.lerp(a, this, t);
-  }
-
-  @override
-  BoxDecoration lerpTo(Decoration b, double t) {
-    if (b is! BoxDecoration)
-      return BoxDecoration.lerp(this, null, t);
-    return BoxDecoration.lerp(this, b, t);
   }
 
   @override
@@ -261,21 +266,17 @@ class _BoxDecorationPainter extends BoxPainter {
   Rect _rectForCachedBackgroundPaint;
   Paint _getBackgroundPaint(Rect rect) {
     assert(rect != null);
+    assert(_decoration.gradient != null || _rectForCachedBackgroundPaint == null);
+
     if (_cachedBackgroundPaint == null ||
-        (_decoration.gradient == null && _rectForCachedBackgroundPaint != null) ||
         (_decoration.gradient != null && _rectForCachedBackgroundPaint != rect)) {
       final Paint paint = new Paint();
-
       if (_decoration.color != null)
         paint.color = _decoration.color;
-
       if (_decoration.gradient != null) {
         paint.shader = _decoration.gradient.createShader(rect);
         _rectForCachedBackgroundPaint = rect;
-      } else {
-        _rectForCachedBackgroundPaint = null;
       }
-
       _cachedBackgroundPaint = paint;
     }
 
