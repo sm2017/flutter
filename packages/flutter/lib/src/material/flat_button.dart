@@ -61,6 +61,7 @@ class FlatButton extends StatelessWidget {
     this.disabledColor,
     this.textTheme,
     this.colorBrightness,
+    this.shape,
     @required this.child
   }) : assert(child != null),
        super(key: key);
@@ -137,6 +138,11 @@ class FlatButton extends StatelessWidget {
   ///
   /// Defaults to the brightness from [ThemeData.brightness].
   final Brightness colorBrightness;
+
+  /// The shape of the button.
+  ///
+  /// By default, XXX
+  final ShapeBorder shape;
 
   /// The widget below this widget in the tree.
   ///

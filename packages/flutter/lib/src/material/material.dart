@@ -20,30 +20,51 @@ typedef Rect RectCallback();
 /// See also:
 ///
 ///  * [Material], in particular [Material.type]
-///  * [kMaterialEdges]
+///  * [kMaterialEdges], which defines the default border radii for each kind of material.
 enum MaterialType {
   /// Infinite extent using default theme canvas color.
+  ///
+  /// If this is used, the [Material] cannot have a [Material.borderRadius] or
+  /// [Material.shape]. It is, by definition, infinite; in practice this means
+  /// it renders in the available space and that this is expected to reach the
+  /// edges of the display surface.
   canvas,
 
   /// Rounded edges, card theme color.
+  ///
+  /// The shape can be adjusted by explicitly specifying the
+  /// [Material.borderRadius] or [Material.shape].
   card,
 
   /// A circle, no color by default (used for floating action buttons).
+  ///
+  /// If this is used, the [Material] cannot have a [Material.borderRadius] or
+  /// [Material.shape]. The shape is a circle.
   circle,
 
   /// Rounded edges, no color by default (used for [MaterialButton] buttons).
+  ///
+  /// The shape can be adjusted by explicitly specifying the
+  /// [Material.borderRadius] or [Material.shape].
   button,
 
   /// A transparent piece of material that draws ink splashes and highlights.
-  transparency
+  ///
+  /// The shape can be adjusted by explicitly specifying the
+  /// [Material.borderRadius] or [Material.shape].
+  transparency,
 }
 
-/// The border radii used by the various kinds of material in material design.
+/// The default border radii used by the various kinds of material in material design.
+///
+/// The values in this list can be overridden by specifying
+/// [Material.borderRadius]. If a [Material.shape] is specified, the values here
+/// are entirely ignored.
 ///
 /// See also:
 ///
-///  * [MaterialType]
-///  * [Material]
+///  * [MaterialType], which identifies the different default kinds of material.
+///  * [Material], the widget which uses these values.
 final Map<MaterialType, BorderRadius> kMaterialEdges = <MaterialType, BorderRadius> {
   MaterialType.canvas: null,
   MaterialType.card: new BorderRadius.circular(2.0),
@@ -96,9 +117,17 @@ abstract class MaterialInkController {
 /// placed inside Material.) Otherwise, in-progress ink features (e.g., ink
 /// splashes and ink highlights) won't move to account for the new layout.
 ///
-/// In general, the features of a [Material] should not change over time (e.g. a
-/// [Material] should not change its [color], [shadowColor] or [type]). The one
-/// exception is the [elevation], changes to which will be animated.
+/// The [type] of a [Material] should not change over time.
+///
+/// The colors of a [Material] ([color] and [shadowColor]) may change, but
+/// changes will not be animated by the [Material] itself. If the colors need to
+/// change, consider doing so using an [AnimatedBuilder] to change the colors
+/// over time.
+///
+/// The [elevation] and [shape] may change, and changes will be animated. For
+/// example, the elevation of the [Material] in a [RaisedButton] changes in
+/// response to user feedback. The [shape] should only change very rarely as the
+/// user experience will be jarring.
 ///
 /// See also:
 ///
@@ -108,7 +137,12 @@ abstract class MaterialInkController {
 class Material extends StatefulWidget {
   /// Creates a piece of material.
   ///
-  /// The [type], [elevation] and [shadowColor] arguments must not be null.
+  /// The [type], [elevation], and [shadowColor] arguments must not be null.
+  ///
+  /// One or both of the [borderRadius] and [shape] arguments must be null.
+  ///
+  /// If the [type] argument is [MaterialType.canvas] or [MaterialType.circle],
+  /// then the [shape] and [borderRadius] arguments must both be null.
   const Material({
     Key key,
     this.type: MaterialType.canvas,
@@ -117,19 +151,27 @@ class Material extends StatefulWidget {
     this.shadowColor: const Color(0xFF000000),
     this.textStyle,
     this.borderRadius,
+    this.shape,
     this.child,
   }) : assert(type != null),
        assert(elevation != null),
        assert(shadowColor != null),
+       assert(!(identical(type, MaterialType.canvas) && borderRadius != null)),
        assert(!(identical(type, MaterialType.circle) && borderRadius != null)),
+       assert(!(identical(type, MaterialType.canvas) && shape != null)),
+       assert(!(identical(type, MaterialType.circle) && shape != null)),
+       assert(borderRadius == null || shape == null),
        super(key: key);
 
   /// The widget below this widget in the tree.
   final Widget child;
 
-  /// The kind of material to show (e.g., card or canvas). This
-  /// affects the shape of the widget, the roundness of its corners if
-  /// the shape is rectangular, and the default color.
+  /// The kind of material to show (e.g., card or canvas). This affects the
+  /// default shape of the widget, the roundness of its corners if the [shape]
+  /// is rectangular, and the default color.
+  ///
+  /// If the [type] is [MaterialType.canvas] or [MaterialType.circle], the
+  /// [shape] and [borderRadius] properties must be null.
   final MaterialType type;
 
   /// The z-coordinate at which to place this material. This controls the size
@@ -156,14 +198,33 @@ class Material extends StatefulWidget {
   final Color shadowColor;
 
   /// The typographical style to use for text within this material.
+  ///
+  /// By default, this uses the ambient [Theme]'s [TextStyle.body1].
   final TextStyle textStyle;
 
   /// If non-null, the corners of this box are rounded by this [BorderRadius].
   /// Otherwise, the corners specified for the current [type] of material are
   /// used.
   ///
-  /// Must be null if [type] is [MaterialType.circle].
+  /// Must be null if [type] is [MaterialType.canvas] or [MaterialType.circle].
+  ///
+  /// If [shape] is non-null, this must be null.
+  ///
+  /// Changing this value will cause the shadow to animate over
+  /// [kThemeChangeDuration].
   final BorderRadius borderRadius;
+
+  /// If non-null, specifies the shape (and outline style) to use for the
+  /// [Material]. Otherwise, the shape specified for the current [type] of
+  /// material are used.
+  ///
+  /// Must be null if [type] is [MaterialType.canvas] or [MaterialType.circle].
+  ///
+  /// If [borderRadius] is non-null, this must be null.
+  ///
+  /// Changing this value will cause the shadow to animate over
+  /// [kThemeChangeDuration].
+  final ShapeBorder shape;
 
   /// The ink controller from the closest instance of this class that
   /// encloses the given context.
@@ -190,6 +251,7 @@ class Material extends StatefulWidget {
     description.add(new DiagnosticsProperty<Color>('shadowColor', shadowColor, defaultValue: const Color(0xFF000000)));
     textStyle?.debugFillProperties(description, prefix: 'textStyle.');
     description.add(new EnumProperty<BorderRadius>('borderRadius', borderRadius, defaultValue: null));
+    description.add(new DiagnosticsProperty<ShapeBorder>('shape', shape, defaultValue: null));
   }
 
   /// The default radius of an ink splash in logical pixels.
@@ -217,7 +279,6 @@ class _MaterialState extends State<Material> with TickerProviderStateMixin {
     final Color backgroundColor = _getBackgroundColor(context);
     assert(backgroundColor != null || widget.type == MaterialType.transparency);
     Widget contents = widget.child;
-    final BorderRadius radius = widget.borderRadius ?? kMaterialEdges[widget.type];
     if (contents != null) {
       contents = new AnimatedDefaultTextStyle(
         style: widget.textStyle ?? Theme.of(context).textTheme.body1,
@@ -239,42 +300,91 @@ class _MaterialState extends State<Material> with TickerProviderStateMixin {
       )
     );
 
-    if (widget.type == MaterialType.circle) {
-      contents = new AnimatedPhysicalModel(
-        curve: Curves.fastOutSlowIn,
-        duration: kThemeChangeDuration,
-        shape: BoxShape.circle,
-        elevation: widget.elevation,
-        color: backgroundColor,
-        shadowColor: widget.shadowColor,
-        animateColor: false,
-        child: contents,
-      );
-    } else if (widget.type == MaterialType.transparency) {
-      if (radius == null) {
-        contents = new ClipRect(child: contents);
-      } else {
-        contents = new ClipRRect(
-          borderRadius: radius,
-          child: contents
+    assert(widget.type != null);
+    switch (widget.type) {
+      case MaterialType.circle:
+        return new AnimatedPhysicalModel(
+          curve: Curves.fastOutSlowIn,
+          duration: kThemeChangeDuration,
+          shape: BoxShape.circle,
+          elevation: widget.elevation,
+          color: backgroundColor,
+          shadowColor: widget.shadowColor,
+          animateColor: false,
+          animateShadowColor: false,
+          child: contents,
         );
-      }
-    } else {
-      contents = new AnimatedPhysicalModel(
-        curve: Curves.fastOutSlowIn,
-        duration: kThemeChangeDuration,
-        shape: BoxShape.rectangle,
-        borderRadius: radius ?? BorderRadius.zero,
-        elevation: widget.elevation,
-        color: backgroundColor,
-        shadowColor: widget.shadowColor,
-        animateColor: false,
-        child: contents,
-      );
+      case MaterialType.canvas:
+        contents = new AnimatedPhysicalModel(
+          curve: Curves.fastOutSlowIn,
+          duration: kThemeChangeDuration,
+          shape: BoxShape.rectangle,
+          elevation: widget.elevation,
+          color: backgroundColor,
+          shadowColor: widget.shadowColor,
+          animateColor: false,
+          animateShadowColor: false,
+          child: contents,
+        );
+      case MaterialType.card:
+      case MaterialType.button:
+        if (widget.shape != null) {
+          return new AnimatedPhysicalShape(
+            curve: Curves.fastOutSlowIn,
+            duration: kThemeChangeDuration,
+            shape: widget.shape
+            elevation: widget.elevation,
+            color: backgroundColor,
+            shadowColor: widget.shadowColor,
+            animateColor: false,
+            animateShadowColor: false,
+            child: contents,
+          );
+        }
+        return new AnimatedPhysicalModel(
+          curve: Curves.fastOutSlowIn,
+          duration: kThemeChangeDuration,
+          shape: BoxShape.rectangle, // XXX
+          borderRadius: radius ?? BorderRadius.zero, // XXX
+          elevation: widget.elevation,
+          color: backgroundColor,
+          shadowColor: widget.shadowColor,
+          animateColor: false,
+          animateShadowColor: false,
+          child: contents,
+        );
+        return null;
+      case MaterialType.transparency:
+        if (widget.borderRadius != null) {
+          return new ClipRRect(
+            borderRadius: radius,
+            child: contents,
+          );
+        }
+        if (widget.shape != null) {
+          return new ClipPath(
+            path: new _ShapeClipper(widget.shape),
+            child: contents,
+          );
+        }
+        return new ClipRect(
+          child: contents,
+        );
     }
-
-    return contents;
+    return null;
   }
+}
+
+class _ShapeClipper extends CustomClipper<Path> {
+  _ShapeClipper(this.shape);
+  final ShapeBorder shape;
+  // TODO(ianh): implement getApproximateClipRect
+  @override
+  Path getClip(Size size) => shape.getOuterPath(Offset.zero & size);
+  @override
+  bool shouldReclip(_ShapeClipper oldClipper) => shape != oldClipper.shape;
+  @override
+  String toString() => 'ShapeClipper($shape)';
 }
 
 const Duration _kHighlightFadeDuration = const Duration(milliseconds: 200);

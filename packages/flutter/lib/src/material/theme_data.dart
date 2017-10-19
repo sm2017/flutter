@@ -49,6 +49,9 @@ const Color _kDarkThemeSplashColor = const Color(0x40CCCCCC);
 /// To obtain the current theme, use [Theme.of].
 @immutable
 class ThemeData {
+
+  // XXX need to add a default shape for various kinds of widgets
+
   /// Create a ThemeData given a set of preferred values.
   ///
   /// Default values will be derived for arguments that are omitted.
