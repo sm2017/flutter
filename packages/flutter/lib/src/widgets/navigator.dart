@@ -776,7 +776,7 @@ class NavigatorState extends State<Navigator> with TickerProviderStateMixin {
       if (plannedInitialRoutes.contains(null)) {
         assert(() {
           FlutterError.reportError(
-            new FlutterErrorDetails( // ignore: prefer_const_constructors, https://github.com/dart-lang/sdk/issues/29952
+            new FlutterErrorDetails(
               exception:
                 'Could not navigate to initial route.\n'
                 'The requested route name was: "/$initialRouteName"\n'
