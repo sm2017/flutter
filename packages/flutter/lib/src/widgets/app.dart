@@ -433,6 +433,8 @@ class _WidgetsAppState extends State<WidgetsApp> implements WidgetsBindingObserv
     }
   }
 
+// TODO(ianh): REMOVE vvvvvvvvvvvvvvvvvvvvvvvvvvvv
+
   // On Android: the user has pressed the back button.
   @override
   Future<bool> didPopRoute() async {
@@ -452,6 +454,8 @@ class _WidgetsAppState extends State<WidgetsApp> implements WidgetsBindingObserv
     navigator.pushNamed(route);
     return true;
   }
+
+// TODO(ianh): REMOVE ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
   // LOCALIZATION

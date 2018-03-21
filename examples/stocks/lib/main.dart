@@ -90,19 +90,16 @@ class StocksAppState extends State<StocksApp> {
     // the first component is not empty:
     if (path[0] != '')
       return null;
-    // If the path is "/stock:..." then show a stock page for the
-    // specified stock symbol.
-    if (path[1].startsWith('stock:')) {
+    // If the path is "/stock" then show a stock page for the
+    // stock symbol specified in the arguments.
+    if (path[1] == 'stock') {
       // We don't yet support subpages of a stock, so bail if there's
       // any more path components.
       if (path.length != 2)
         return null;
-      // Extract the symbol part of "stock:..." and return a route
-      // for that symbol.
-      final String symbol = path[1].substring(6);
       return new MaterialPageRoute<void>(
-        settings: settings,
-        builder: (BuildContext context) => new StockSymbolPage(symbol: symbol, stocks: stocks),
+        settings: settings, // the symbol is stored in `settings.arguments.get(String)`
+        builder: (BuildContext context) => new StockSymbolPage(stocks: stocks),
       );
     }
     // The other paths we support are in the routes table.
