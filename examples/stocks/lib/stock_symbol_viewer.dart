@@ -64,13 +64,27 @@ class _StockSymbolView extends StatelessWidget {
 }
 
 class StockSymbolPage extends StatelessWidget {
-  const StockSymbolPage({ this.symbol, this.stocks });
+  const StockSymbolPage({ this.stocks });
 
-  final String symbol;
   final StockData stocks;
 
   @override
   Widget build(BuildContext context) {
+    // We get our stock symbol from the route arguments.
+    // If this page was requested internally, then the symbol is
+    // in the arguments under the "String" key.
+    final TypedDictionary arguments = ModalRoute.of(context).settings.arguments;
+    String symbol = arguments.get<String>();
+    if (symbol == null) {
+      // If there's no symbol there, then maybe we were invoked from the OS. In
+      // that case, look up the query arguments, and see if there was a "stock"
+      // query argument. The query arguments are stored under the "Map<String,
+      // List<String>>" key.
+      final Map<String, List<String>> query = arguments.get<Map<String, List<String>>>();
+      final List<String> stocks = query['stock'];
+      if (stocks != null && stocks.isNotEmpty)
+        symbol = stocks.first;
+    }
     return new AnimatedBuilder(
       animation: stocks,
       builder: (BuildContext context, Widget child) {
@@ -98,7 +112,7 @@ class StockSymbolPage extends StatelessWidget {
                       ),
                     ) : new Padding(
                         padding: const EdgeInsets.all(20.0),
-                        child: new Center(child: new Text('$symbol not found')),
+                        child: new Center(child: new Text(symbol == null ? 'No stock specified' : '$symbol not found')),
                     ),
                   crossFadeState: stock == null && stocks.loading ? CrossFadeState.showFirst : CrossFadeState.showSecond,
                 ),

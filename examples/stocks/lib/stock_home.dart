@@ -260,7 +260,7 @@ class StockHomeState extends State<StockHome> {
       stocks: stocks.toList(),
       onAction: _buyStock,
       onOpen: (Stock stock) {
-        Navigator.pushNamed(context, '/stock:${stock.symbol}');
+        Navigator.pushNamed(context, '/stock', arguments: new TypedDictionary()..set<String>(stock.symbol));
       },
       onShow: (Stock stock) {
         _scaffoldKey.currentState.showBottomSheet<Null>((BuildContext context) => new StockSymbolBottomSheet(stock: stock));

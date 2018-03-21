@@ -434,7 +434,7 @@ abstract class WidgetsBinding extends BindingBase with SchedulerBinding, Gesture
     }
   }
 
-  Future<dynamic> _handleNavigationInvocation(MethodCall methodCall) {
+  Future<Null> _handleNavigationInvocation(MethodCall methodCall) {
     switch (methodCall.method) {
       case 'popRoute':
         return handlePopRoute();
