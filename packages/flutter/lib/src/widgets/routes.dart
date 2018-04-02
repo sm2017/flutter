@@ -34,11 +34,11 @@ abstract class OverlayRoute<T> extends Route<T> {
   final List<OverlayEntry> _overlayEntries = <OverlayEntry>[];
 
   @override
-  void install(OverlayEntry insertionPoint) {
+  void install(OverlayEntry insertionPoint, { bool isInitialRoute: false }) {
     assert(_overlayEntries.isEmpty);
     _overlayEntries.addAll(createOverlayEntries());
     navigator.overlay?.insertAll(_overlayEntries, above: insertionPoint);
-    super.install(insertionPoint);
+    super.install(insertionPoint, isInitialRoute: isInitialRoute);
   }
 
   /// Controls whether [didPop] calls [NavigatorState.finalizeRoute].
@@ -118,15 +118,23 @@ abstract class TransitionRoute<T> extends OverlayRoute<T> {
   /// Called to create the animation controller that will drive the transitions to
   /// this route from the previous one, and back to the previous route from this
   /// one.
-  AnimationController createAnimationController() {
+  ///
+  /// The `isInitialRoute` argument indicates whether this route is part of the
+  /// first batch of routes being pushed onto the [Navigator]. The default
+  /// implementation will return an already-completed [AnimationController]
+  /// when this is true.
+  AnimationController createAnimationController({ bool isInitialRoute: false }) {
     assert(!_transitionCompleter.isCompleted, 'Cannot reuse a $runtimeType after disposing it.');
     final Duration duration = transitionDuration;
     assert(duration != null && duration >= Duration.zero);
-    return new AnimationController(
+    final AnimationController result = new AnimationController(
       duration: duration,
       debugLabel: debugLabel,
       vsync: navigator,
     );
+    if (isInitialRoute)
+      result.value = 1.0;
+    return result;
   }
 
   /// Called to create the animation that exposes the current progress of
@@ -173,13 +181,13 @@ abstract class TransitionRoute<T> extends OverlayRoute<T> {
   final ProxyAnimation _secondaryAnimation = new ProxyAnimation(kAlwaysDismissedAnimation);
 
   @override
-  void install(OverlayEntry insertionPoint) {
+  void install(OverlayEntry insertionPoint, { bool isInitialRoute: false }) {
     assert(!_transitionCompleter.isCompleted, 'Cannot install a $runtimeType after disposing it.');
-    _controller = createAnimationController();
+    _controller = createAnimationController(isInitialRoute: isInitialRoute);
     assert(_controller != null, '$runtimeType.createAnimationController() returned null.');
     _animation = createAnimation();
     assert(_animation != null, '$runtimeType.createAnimation() returned null.');
-    super.install(insertionPoint);
+    super.install(insertionPoint, isInitialRoute: isInitialRoute);
   }
 
   @override

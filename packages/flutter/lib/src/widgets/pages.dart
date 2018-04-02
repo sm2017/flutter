@@ -34,14 +34,6 @@ abstract class PageRoute<T> extends ModalRoute<T> {
 
   @override
   bool canTransitionFrom(TransitionRoute<dynamic> previousRoute) => previousRoute is PageRoute;
-
-  @override
-  AnimationController createAnimationController() {
-    final AnimationController controller = super.createAnimationController();
-    if (settings.isInitialRoute)
-      controller.value = 1.0;
-    return controller;
-  }
 }
 
 /// Signature for the [PageRouteBuilder] function that builds the route's
