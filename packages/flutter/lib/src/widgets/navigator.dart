@@ -1304,21 +1304,27 @@ class Navigator extends StatefulWidget {
   /// given context.
   ///
   /// {@template flutter.widgets.navigator.pop}
-  /// If the route in question was added using [Navigator.pages], the
-  /// [Navigator.onPopPage] callback is invoked, passing it the `result`
-  /// argument.
+  /// The route's approriate _handler_ (as defined below) is called, passing it
+  /// the _result of the route_ (also as defined below). If the handler returns
+  /// false, then this method returns true but nothing else is changed (the
+  /// route is expected to have popped some internal state; see e.g.
+  /// [LocalHistoryRoute]). If the handler returns true, then the route is
+  /// scheduled for removal.
   ///
-  /// Otherwise, the current route's [Route.didPop] method is called; if that
-  /// method returns false, then this method returns true but nothing else is
-  /// changed (the route is expected to have popped some internal state; see
-  /// e.g. [LocalHistoryRoute]).
+  /// _Handler_: If the route in question was added using [Navigator.pages], the
+  /// [Navigator.onPopPage] callback is used as the handler (typically this
+  /// calls [Route.didPop] then, if the route was indeed popped, uses
+  /// [State.setState] to update the [Navigator.pages] list to omit the now
+  /// popped route); otherwise, the current route's [Route.didPop] method is
+  /// used directly, and the route will be removed directly if necessary.
   ///
-  /// Otherwise, if non-null, `result` will be used as the result of the route
-  /// that is popped; the future that had been returned from pushing the popped
-  /// route will complete with `result`. Routes such as dialogs or popup menus
-  /// typically use this mechanism to return the value selected by the user to
-  /// the widget that created their route. The type of `result`, if provided,
-  /// must match the type argument of the class of the popped route (`T`).
+  /// _Result of the route_: If non-null, `result` will be used as the result of
+  /// the route that is popped. If `result` is null, then the
+  /// [Route.currentResult] value is used instead. The future that had been
+  /// returned from pushing the now popped route will complete with this result.
+  /// Routes such as dialogs or popup menus typically use this mechanism to
+  /// return the value selected by the user to the widget that created their
+  /// route.
   ///
   /// The popped route and the route below it are notified (see [Route.didPop],
   /// [Route.didComplete], and [Route.didPopNext]). If the [Navigator] has any
@@ -1326,9 +1332,8 @@ class Navigator extends StatefulWidget {
   /// [NavigatorObserver.didPop]).
   ///
   /// The `T` type argument is the type of the return value of the popped route.
-  ///
-  /// Returns true if a route was popped (including if [Route.didPop] returned
-  /// false); returns false if there are no further previous routes.
+  /// The type of `result`, if provided, must match the type argument of the
+  /// class of the popped route (`T`).
   /// {@endtemplate}
   ///
   /// ## Sample code
@@ -1777,6 +1782,67 @@ class NavigatorState extends State<Navigator> with TickerProviderStateMixin {
         observer.didRemove(removedRoute, oldRoute);
     }
     // xxxx
+
+    // REPLACE
+    // xxxx this should be replaced with code that reuses the logic above
+    // xxx just add the route entry with the appropriate life cycle, then
+    //     run the logic to send notifications
+    assert(() { _debugLocked = true; return true; }());
+    assert(oldRoute._navigator == this);
+    assert(newRoute._navigator == null);
+    assert(oldRoute.overlayEntries.isNotEmpty);
+    assert(newRoute.overlayEntries.isEmpty);
+    assert(!overlay.debugIsVisible(oldRoute.overlayEntries.last));
+    final int index = _history.indexOf(oldRoute);
+    assert(index >= 0);
+    newRoute._navigator = this;
+    newRoute.install(oldRoute.overlayEntries.last);
+    _history[index] = newRoute;
+    newRoute.didReplace(oldRoute);
+    if (index + 1 < _history.length) {
+      newRoute.didChangeNext(_history[index + 1]);
+      _history[index + 1].didChangePrevious(newRoute);
+    } else {
+      newRoute.didChangeNext(null);
+    }
+    if (index > 0)
+      _history[index - 1].didChangeNext(newRoute);
+    for (NavigatorObserver observer in widget.observers)
+      observer.didReplace(newRoute: newRoute, oldRoute: oldRoute);
+    oldRoute.dispose();
+    // xxxx
+
+    // POP
+    // xxxx this should be replaced with code that reuses the logic above
+    // xxx just add the route entry with the appropriate life cycle, then
+    //     run the logic to send notifications
+    // xxx also handle page routes by calling willpop, setting the current
+    //     return value, and then call our onPopPage handler
+    final Route<dynamic> route = _history.last;
+    assert(route._navigator == this);
+    bool debugPredictedWouldPop;
+    assert(() { debugPredictedWouldPop = !route.willHandlePopInternally; return true; }());
+    if (route.didPop(result ?? route.currentResult)) {
+      assert(debugPredictedWouldPop);
+      if (_history.length > 1) {
+        _history.removeLast();
+        // If route._navigator is null, the route called finalizeRoute from
+        // didPop, which means the route has already been disposed and doesn't
+        // need to be added to _poppedRoutes for later disposal.
+        if (route._navigator != null)
+          _poppedRoutes.add(route);
+        _history.last.didPopNext(route);
+        for (NavigatorObserver observer in widget.observers)
+          observer.didPop(route, _history.last);
+      } else {
+        assert(() { _debugLocked = false; return true; }());
+        return false;
+      }
+    } else {
+      assert(!debugPredictedWouldPop);
+    }
+    // xxxx
+
   }
 
   Route<T> _routeNamed<T>(String name, { @required TypedDictionary arguments }) {
@@ -1969,7 +2035,7 @@ class NavigatorState extends State<Navigator> with TickerProviderStateMixin {
     assert(!_debugLocked);
     assert(() { _debugLocked = true; return true; }());
     assert(_history.isNotEmpty);
-    _history.last.remove<TO>(result);
+    _history.lastWhere(_RouteEntry.isPresent).remove<TO>(result);
     _history.add(new _RouteEntry(route));
     _flushHistoryUpdates();
     assert(() { _debugLocked = false; return true; }());
@@ -2025,33 +2091,11 @@ class NavigatorState extends State<Navigator> with TickerProviderStateMixin {
     assert(newRoute != null);
     if (oldRoute == newRoute) // ignore: unrelated_type_equality_checks, https://github.com/dart-lang/sdk/issues/32522
       return;
-    // xxxx this should be replaced with code that reuses the logic above
-    // xxx just add the route entry with the appropriate life cycle, then
-    //     run the logic to send notifications
-    assert(() { _debugLocked = true; return true; }());
-    assert(oldRoute._navigator == this);
-    assert(newRoute._navigator == null);
-    assert(oldRoute.overlayEntries.isNotEmpty);
-    assert(newRoute.overlayEntries.isEmpty);
-    assert(!overlay.debugIsVisible(oldRoute.overlayEntries.last));
     final int index = _history.indexOf(oldRoute);
     assert(index >= 0);
-    newRoute._navigator = this;
-    newRoute.install(oldRoute.overlayEntries.last);
-    _history[index] = newRoute;
-    newRoute.didReplace(oldRoute);
-    if (index + 1 < _history.length) {
-      newRoute.didChangeNext(_history[index + 1]);
-      _history[index + 1].didChangePrevious(newRoute);
-    } else {
-      newRoute.didChangeNext(null);
-    }
-    if (index > 0)
-      _history[index - 1].didChangeNext(newRoute);
-    for (NavigatorObserver observer in widget.observers)
-      observer.didReplace(newRoute: newRoute, oldRoute: oldRoute);
-    oldRoute.dispose();
-    // xxxx
+    _history.insert(index + 1, newRoute, initialState: _RouteLifecycle.replace);
+    oldRoute.remove();
+    _flushHistoryUpdates();
     assert(() { _debugLocked = false; return true; }());
   }
 
@@ -2098,7 +2142,7 @@ class NavigatorState extends State<Navigator> with TickerProviderStateMixin {
   ///   to define the route's `willPop` method.
   @optionalTypeArgs
   Future<bool> maybePop<T extends Object>([ T result ]) async {
-    final Route<T> route = _history.last;
+    final Route<T> route = _history.lastWhere(_RouteEntry.isPresent);
     assert(route._navigator == this);
     final RoutePopDisposition disposition = await route.willPop();
     if (disposition != RoutePopDisposition.bubble && mounted) {
@@ -2133,39 +2177,19 @@ class NavigatorState extends State<Navigator> with TickerProviderStateMixin {
   @optionalTypeArgs
   bool pop<T extends Object>([ T result ]) {
     assert(!_debugLocked);
-    assert(() { _debugLocked = true; return true; }());
-    // xxxx this should be replaced with code that reuses the logic above
-    // xxx just add the route entry with the appropriate life cycle, then
-    //     run the logic to send notifications
-    // xxx also handle page routes by calling willpop, setting the current
-    //     return value, and then call our onPopPage handler
-    final Route<dynamic> route = _history.last;
-    assert(route._navigator == this);
-    bool debugPredictedWouldPop;
-    assert(() { debugPredictedWouldPop = !route.willHandlePopInternally; return true; }());
-    if (route.didPop(result ?? route.currentResult)) {
-      assert(debugPredictedWouldPop);
-      if (_history.length > 1) {
-        _history.removeLast();
-        // If route._navigator is null, the route called finalizeRoute from
-        // didPop, which means the route has already been disposed and doesn't
-        // need to be added to _poppedRoutes for later disposal.
-        if (route._navigator != null)
-          _poppedRoutes.add(route);
-        _history.last.didPopNext(route);
-        for (NavigatorObserver observer in widget.observers)
-          observer.didPop(route, _history.last);
-      } else {
-        assert(() { _debugLocked = false; return true; }());
-        return false;
-      }
+    final _RouteEntry entry = _history.lastWhere(_RouteEntry.isPresent);
+    bool result;
+    if (entry.hasPage) {
+      result = true;
     } else {
-      assert(!debugPredictedWouldPop);
+      assert(() { _debugLocked = true; return true; }());
+      result = entry.pop<T>(result);
+      //xxxx
+      _flushHistoryUpdates();
+      assert(() { _debugLocked = false; return true; }());
+      _cancelActivePointers();
     }
-    // xxxx
-    assert(() { _debugLocked = false; return true; }());
-    _cancelActivePointers();
-    return true;
+    return result;
   }
 
   /// Calls [pop] repeatedly until the predicate returns true.
@@ -2182,8 +2206,13 @@ class NavigatorState extends State<Navigator> with TickerProviderStateMixin {
   /// }
   /// ```
   void popUntil(RoutePredicate predicate) {
-    while (!predicate(_history.last))
-      pop();
+    for (int index = _history.length - 1; index >= 0; index -= 1) {
+      if (_RouteEntry.isPresent(_history[index])) {
+        if (predicate(_history.last))
+          break;
+        _history[index].pop();
+      }
+    }
   }
 
   /// Immediately remove `route` from the navigator, and [Route.dispose] it.
