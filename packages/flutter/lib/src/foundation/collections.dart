@@ -48,7 +48,7 @@ bool listEquals<T>(List<T> a, List<T> b) {
   return true;
 }
 
-/// A map of key-value pairs where each key is a [Type] and each value is of
+/// A map of key-value pairs where each key is a [Type] and its value is of
 /// that type.
 class TypedDictionary {
   /// Creates an empty, mutable, typed dictionary.

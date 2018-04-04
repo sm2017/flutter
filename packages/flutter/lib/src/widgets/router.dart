@@ -100,7 +100,7 @@ import 'placeholder.dart';
 /// proceed in a completely synchronous way, which removes a number of
 /// complications.
 ///
-/// Using asynchronous computation is entirely reasonable, however and the API
+/// Using asynchronous computation is entirely reasonable, however, and the API
 /// is designed to support it. For example, maybe a set of images need to be
 /// loaded before a route can be shown; waiting for those images to be loaded
 /// before [ParsedRouteHandler.pushRoute] returns is a reasonable approach to
@@ -286,6 +286,8 @@ class _RouterState<T> extends State<Router<T>> {
       });
   }
 
+  static final Future<dynamic> _never = new Completer<dynamic>().future; // won't ever complete
+
   _AsyncPassthrough<T> _verifyRouteNameParserStillCurrent(Object transaction, Router<T> originalWidget) {
     return (T data) {
       if (transaction == _currentRouteNameParserTransaction &&
@@ -296,7 +298,7 @@ class _RouterState<T> extends State<Router<T>> {
         _currentParsedRouteHandlerTransaction = new Object();
         return new SynchronousFuture<T>(data);
       }
-      return new Completer<T>().future; // won't ever complete
+      return _never;
     };
   }
 
@@ -308,7 +310,7 @@ class _RouterState<T> extends State<Router<T>> {
           widget.routeNameParser == originalWidget.routeNameParser &&
           widget.parsedRouteHandler == originalWidget.parsedRouteHandler)
         return new SynchronousFuture<void>(null);
-      return new Completer<void>().future; // won't ever complete
+      return _never;
     };
   }
 
@@ -342,6 +344,8 @@ class _RouterState<T> extends State<Router<T>> {
       parsedRouteHandler: widget.parsedRouteHandler,
       routerState: this,
       child: new Builder(
+        // We use a Builder so that the build method below
+        // will have a BuildContext that contains the _RouterScope.
         builder: widget.parsedRouteHandler.build,
       ),
     );
@@ -396,66 +400,25 @@ class _RouterScope extends InheritedWidget {
 class _CallbackHookProvider<T> {
   ObserverList<ValueGetter<T>> _callbacks = new ObserverList<ValueGetter<T>>();
 
-  /// Asserts that the object has not been disposed.
-  ///
-  /// Always returns true (or throws). This is intended to be used from asserts
-  /// of methods of this class:
-  ///
-  /// ```dart
-  /// assert(debugAssertNotDisposed());
-  /// ```
-  @protected
-  bool debugAssertNotDisposed() {
-    assert(() {
-      if (_callbacks == null) {
-        throw new FlutterError(
-          'A $runtimeType was used after being disposed.\n'
-          'Once you have called dispose() on a $runtimeType, it can no longer be used.'
-        );
-      }
-      return true;
-    }());
-    return true;
-  }
-
   /// Whether a callback is currently registered.
   @protected
   bool get hasCallbacks {
-    assert(debugAssertNotDisposed());
     return _callbacks.isNotEmpty;
   }
 
   /// Register the callback to be called when the object changes.
   ///
-  /// This method must not be called after [dispose] has been called.
-  ///
   /// If other callbacks have already been registered, they must be removed
   /// (with [removeCallback]) before the callback is next called.
   void addCallback(ValueGetter<T> callback) {
-    assert(debugAssertNotDisposed());
     _callbacks.add(callback);
   }
 
   /// Remove a previously registered callback.
   ///
   /// If the given callback is not registered, the call is ignored.
-  ///
-  /// This method must not be called after [dispose] has been called.
   void removeCallback(ValueGetter<T> callback) {
-    assert(debugAssertNotDisposed());
     _callbacks.remove(callback);
-  }
-
-  /// Discards any resources used by the object. After this is called, the
-  /// object is not in a usable state and should be discarded (calls to
-  /// [addCallback] and [removeCallback] will throw after the object is
-  /// disposed).
-  ///
-  /// This method should only be called by the object's owner.
-  @mustCallSuper
-  void dispose() {
-    assert(debugAssertNotDisposed());
-    _callbacks = null;
   }
 
   /// Calls the (single) registered callback and returns its result.
@@ -468,11 +431,8 @@ class _CallbackHookProvider<T> {
   ///
   /// Exceptions thrown by callbacks will be caught and reported using
   /// [FlutterError.reportError].
-  ///
-  /// This method must not be called after [dispose] has been called.
   @protected
   T invokeCallback(T defaultValue) {
-    assert(debugAssertNotDisposed());
     if (_callbacks.isEmpty)
       return defaultValue;
     try {
@@ -516,7 +476,6 @@ abstract class BackButtonDispatcher extends _CallbackHookProvider<Future<bool>> 
 
   @override
   Future<bool> invokeCallback(Future<bool> defaultValue) {
-    assert(debugAssertNotDisposed());
     if (_children != null && _children.isNotEmpty)
       return _children.last.notifiedByParent(defaultValue);
     return super.invokeCallback(defaultValue);
@@ -528,8 +487,11 @@ abstract class BackButtonDispatcher extends _CallbackHookProvider<Future<bool>> 
   /// children. If a [BackButtonDispatcher] does have parents or children,
   /// however, it causes this object to be the one to dispatch the notification
   /// when the parent would normally notify its callback.
+  ///
+  /// The [BackButtonDispatcher] must have a listener registered before it can
+  /// be told to take priority.
   void takePriority() {
-    assert(debugAssertNotDisposed());
+    assert(hasCallbacks);
     if (_children != null)
       _children.clear();
   }
@@ -546,14 +508,16 @@ abstract class BackButtonDispatcher extends _CallbackHookProvider<Future<bool>> 
   ///
   /// Calling this again without first calling [forget] moves the child back to
   /// the head of the list.
-  //
+  ///
   // (Actually it moves it to the end of the list and we treat the end of the
   // list to be the priority end, but that's an implementation detail.)
+  //
+  /// The [BackButtonDispatcher] must have a listener registered before it can
+  /// be told to defer to a child.
   void deferTo(ChildBackButtonDispatcher child) {
-    assert(debugAssertNotDisposed());
+    assert(hasCallbacks);
     _children ??= new LinkedHashSet<ChildBackButtonDispatcher>();
-    if (_children.contains(child))
-      _children.remove(child);
+    _children.remove(child); // child may or may not be in the set already
     _children.add(child);
   }
 
@@ -570,7 +534,6 @@ abstract class BackButtonDispatcher extends _CallbackHookProvider<Future<bool>> 
   /// additionally attempt to claim priority from its parent, whereas removing
   /// the last child does not.)
   void forget(ChildBackButtonDispatcher child) {
-    assert(debugAssertNotDisposed());
     assert(_children != null);
     assert(_children.contains(child));
     _children.remove(child);
@@ -589,13 +552,14 @@ abstract class BackButtonDispatcher extends _CallbackHookProvider<Future<bool>> 
 class ChildBackButtonDispatcher extends BackButtonDispatcher {
   /// Creates a back button dispatcher that acts as the child of another.
   ///
-  /// The [parent] must not be null and must not be disposed before this object.
+  /// The [parent] must not be null.
   ChildBackButtonDispatcher(this.parent) : assert(parent != null);
 
   /// The back button dispatcher that this object will attempt to take priority
   /// over when [takePriority] is called.
   ///
-  /// The parent must not be disposed before this object.
+  /// The parent must have a listener registered before this child object can
+  /// have its [takePriority] or [deferTo] methods used.
   final BackButtonDispatcher parent;
 
   @protected
@@ -605,20 +569,23 @@ class ChildBackButtonDispatcher extends BackButtonDispatcher {
 
   @override
   void takePriority() {
+    assert(hasCallbacks);
     parent.deferTo(this);
     super.takePriority();
   }
 
   @override
   void deferTo(ChildBackButtonDispatcher child) {
+    assert(hasCallbacks);
     parent.deferTo(this);
     super.deferTo(child);
   }
 
   @override
-  void dispose() {
-    parent.forget(this);
-    super.dispose();
+  void removeCallback(ValueGetter<T> callback) {
+    super.removeCallback(callback);
+    if (!hasCallbacks)
+      parent.forget(this);
   }
 }
 
@@ -727,35 +694,56 @@ abstract class ParsedRouteHandler<T> implements Listenable {
 // DEFAULT IMPLEMENTATIONS
 
 class DefaultRouteNameProvider extends ValueNotifier<String> with WidgetsBindingObserver {
-  DefaultRouteNameProvider() : super(ui.window.defaultRouteName) {
-    WidgetsBinding.instance.addObserver(this);
+  DefaultRouteNameProvider() : super(ui.window.defaultRouteName);
+
+  @override
+  void addListener(VoidCallback listener) {
+    if (!hasListeners)
+      WidgetsBinding.instance.addObserver(this);
+    super.addListener(listener);
+  }
+
+  @override
+  void removeListener(VoidCallback listener) {
+    super.addListener(listener);
+    if (!hasListeners)
+      WidgetsBinding.instance.removeObserver(this);
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
+    // In practice, this will rarely be called. We assume that the listeners
+    // will be added and removed in a coherent fashion such that when the object
+    // is no longer being used, there's no listener, and so it will get garbage
+    // collected.
+    if (hasListeners)
+      WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   @override
   Future<bool> didPushRoute(String route) async {
-    if (hasListeners) {
-      notifyListeners();
-      return true;
-    }
-    return false;
+    assert(hasListeners);
+    notifyListeners();
+    return true;
   }
 }
 
 class DefaultBackButtonDispatcher extends BackButtonDispatcher with WidgetsBindingObserver {
-  DefaultBackButtonDispatcher() {
-    WidgetsBinding.instance.addObserver(this);
+  DefaultBackButtonDispatcher();
+
+  @override
+  void addCallback(ValueGetter<T> callback) {
+    if (!hasCallbacks)
+      WidgetsBinding.instance.addObserver(this);
+    super.addCallback(callback);
   }
 
   @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
+  void removeCallback(ValueGetter<T> callback) {
+    super.addCallback(callback);
+    if (!hasCallbacks)
+      WidgetsBinding.instance.removeObserver(this);
   }
 
   @override

@@ -28,7 +28,6 @@ abstract class OverlayRoute<T> extends Route<T> {
   /// Subclasses should override this getter to return the builders for the overlay.
   Iterable<OverlayEntry> createOverlayEntries();
 
-  /// The entries this route has placed in the overlay.
   @override
   List<OverlayEntry> get overlayEntries => _overlayEntries;
   final List<OverlayEntry> _overlayEntries = <OverlayEntry>[];
@@ -100,6 +99,10 @@ abstract class TransitionRoute<T> extends OverlayRoute<T> {
   /// the opaque route will not be built to save resources.
   bool get opaque;
 
+  // This ensures that if we got to the dismissed state while still current,
+  // we will still be disposed when we are eventually popped.
+  //
+  // This situation arises when dealing with the Cupertino dismiss gesture.
   @override
   bool get finishedWhenPopped => _controller.status == AnimationStatus.dismissed;
 
@@ -123,7 +126,7 @@ abstract class TransitionRoute<T> extends OverlayRoute<T> {
   /// first batch of routes being pushed onto the [Navigator]. The default
   /// implementation will return an already-completed [AnimationController]
   /// when this is true.
-  AnimationController createAnimationController({ bool isInitialRoute: false }) {
+  AnimationController createAnimationController({ bool isInitialRoute = false }) {
     assert(!_transitionCompleter.isCompleted, 'Cannot reuse a $runtimeType after disposing it.');
     final Duration duration = transitionDuration;
     assert(duration != null && duration >= Duration.zero);
