@@ -304,6 +304,18 @@ class OverlayState extends State<Overlay> with TickerProviderStateMixin {
     });
   }
 
+  /// Change the order of the overlay entries.
+  ///
+  /// This method is called with an [OverlayRearranger] callback, which takes an
+  /// [Iterable] of [OverlayEntry] objects, and must return an [Iterable] of
+  /// [OverlayEntry] objects containing exactly the same entries, although
+  /// optionally in a different order.
+  ///
+  /// The -
+  void rearrange(OverlayRearranger callback) {
+    
+  }
+
   void _remove(OverlayEntry entry) {
     if (mounted) {
       _entries.remove(entry);
