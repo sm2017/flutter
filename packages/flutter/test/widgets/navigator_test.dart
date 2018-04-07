@@ -810,7 +810,45 @@ void main() {
     expect(log, <String>['building B', 'building C', 'found C', 'building D']);
     key.currentState.pop<void>();
     await tester.pumpAndSettle(const Duration(milliseconds: 10));
-    expect(log, <String>['building B', 'building C', 'found C', 'building D', 'building C', 'found C']);
+    expect(log, <String>['building B', 'building C', 'found C', 'building D']);
+  });
+
+  testWidgets('Routes don\'t rebuild just because their animations ended', (WidgetTester tester) async {
+    final GlobalKey<NavigatorState> key = new GlobalKey<NavigatorState>();
+    final List<String> log = <String>[];
+    Route<dynamic> nextRoute = new PageRouteBuilder<int>(
+      pageBuilder: (BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation) {
+        log.add('building page 1 - ${ModalRoute.of(context).canPop}');
+        return const Placeholder();
+      },
+    );
+    await tester.pumpWidget(new MaterialApp(
+      navigatorKey: key,
+      onGenerateRoute: (RouteSettings settings) {
+        assert(nextRoute != null);
+        final Route<dynamic> result = nextRoute;
+        nextRoute = null;
+        return result;
+      },
+    ));
+    expect(log, <String>['building page 1 - false']);
+    key.currentState.pushReplacement(new PageRouteBuilder<int>(
+      pageBuilder: (BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation) {
+        log.add('building page 2 - ${ModalRoute.of(context).canPop}');
+        return const Placeholder();
+      },
+    ));
+    expect(log, <String>['building page 1 - false', 'building page 2 - false']);
+    await tester.pump(const Duration(milliseconds: 150));
+    key.currentState.pushReplacement(new PageRouteBuilder<int>(
+      pageBuilder: (BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation) {
+        log.add('building page 3 - ${ModalRoute.of(context).canPop}');
+        return const Placeholder();
+      },
+    ));
+    expect(log, <String>['building page 1 - false', 'building page 2 - false', 'building page 3 - false']);
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(log, <String>['building page 1 - false', 'building page 2 - false', 'building page 3 - false']);
   });
 
   testWidgets('route semantics', (WidgetTester tester) async {

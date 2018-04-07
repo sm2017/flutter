@@ -167,7 +167,6 @@ abstract class TransitionRoute<T> extends OverlayRoute<T> {
         }
         break;
     }
-    changedInternalState();
   }
 
   @override
@@ -175,7 +174,8 @@ abstract class TransitionRoute<T> extends OverlayRoute<T> {
     assert(!_transitionCompleter.isCompleted, 'Cannot install a $runtimeType after disposing it.');
     _controller = createAnimationController();
     assert(_controller != null, '$runtimeType.createAnimationController() returned null.');
-    _animation = createAnimation();
+    _animation = createAnimation()
+      ..addStatusListener(_handleStatusChanged);
     assert(_animation != null, '$runtimeType.createAnimation() returned null.');
     super.install(insertionPoint);
   }
@@ -184,7 +184,6 @@ abstract class TransitionRoute<T> extends OverlayRoute<T> {
   TickerFuture didPush() {
     assert(_controller != null, '$runtimeType.didPush called before calling install() or after calling dispose().');
     assert(!_transitionCompleter.isCompleted, 'Cannot reuse a $runtimeType after disposing it.');
-    _animation.addStatusListener(_handleStatusChanged);
     return _controller.forward();
   }
 
@@ -194,7 +193,6 @@ abstract class TransitionRoute<T> extends OverlayRoute<T> {
     assert(!_transitionCompleter.isCompleted, 'Cannot reuse a $runtimeType after disposing it.');
     if (oldRoute is TransitionRoute)
       _controller.value = oldRoute._controller.value;
-    _animation.addStatusListener(_handleStatusChanged);
     super.didReplace(oldRoute);
   }
 
