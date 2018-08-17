@@ -143,8 +143,13 @@ class AttachCommand extends FlutterCommand {
       if (daemon != null) {
         AppInstance app;
         try {
-          app = await daemon.appDomain.launch(hotRunner, hotRunner.attach,
-              device, null, true, fs.currentDirectory);
+          app = await daemon.appDomain.launch(
+            hotRunner,
+            hotRunner.attach,
+            device,
+            null,
+            true,
+          );
         } catch (error) {
           throwToolExit(error.toString());
         }

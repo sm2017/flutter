@@ -339,62 +339,72 @@ class AppDomain extends Domain {
     }
 
     // We change the current working directory for the duration of the `start` command.
+    // WARNING: THIS AFFECTS EVERY ISOLATE SYNCHRONOUSLY.
     final Directory cwd = fs.currentDirectory;
     fs.currentDirectory = fs.directory(projectDirectory);
+    try {
 
-    final FlutterDevice flutterDevice = new FlutterDevice(
-      device,
-      previewDart2: options.buildInfo.previewDart2,
-      trackWidgetCreation: trackWidgetCreation,
-      dillOutputPath: dillOutputPath,
-    );
-
-    ResidentRunner runner;
-
-    if (enableHotReload) {
-      runner = new HotRunner(
-        <FlutterDevice>[flutterDevice],
-        target: target,
-        debuggingOptions: options,
-        usesTerminalUI: false,
-        applicationBinary: applicationBinary,
-        projectRootPath: projectRootPath,
-        packagesFilePath: packagesFilePath,
+      final FlutterDevice flutterDevice = new FlutterDevice(
+        device,
+        previewDart2: options.buildInfo.previewDart2,
+        trackWidgetCreation: trackWidgetCreation,
         dillOutputPath: dillOutputPath,
-        ipv6: ipv6,
-        hostIsIde: true,
       );
-    } else {
-      runner = new ColdRunner(
-        <FlutterDevice>[flutterDevice],
-        target: target,
-        debuggingOptions: options,
-        usesTerminalUI: false,
-        applicationBinary: applicationBinary,
-        ipv6: ipv6,
-      );
-    }
 
-    return launch(
+      ResidentRunner runner;
+
+      if (enableHotReload) {
+        runner = new HotRunner(
+          <FlutterDevice>[flutterDevice],
+          target: target,
+          debuggingOptions: options,
+          usesTerminalUI: false,
+          applicationBinary: applicationBinary,
+          projectRootPath: projectRootPath,
+          packagesFilePath: packagesFilePath,
+          dillOutputPath: dillOutputPath,
+          ipv6: ipv6,
+          hostIsIde: true,
+        );
+      } else {
+        runner = new ColdRunner(
+          <FlutterDevice>[flutterDevice],
+          target: target,
+          debuggingOptions: options,
+          usesTerminalUI: false,
+          applicationBinary: applicationBinary,
+          ipv6: ipv6,
+        );
+      }
+
+      return launch(
         runner,
-        ({ Completer<DebugConnectionInfo> connectionInfoCompleter,
-            Completer<void> appStartedCompleter }) => runner.run(
-                connectionInfoCompleter: connectionInfoCompleter,
-                appStartedCompleter: appStartedCompleter,
-                route: route),
+        ({
+          Completer<DebugConnectionInfo> connectionInfoCompleter,
+          Completer<void> appStartedCompleter,
+        }) {
+          return runner.run(
+            connectionInfoCompleter: connectionInfoCompleter,
+            appStartedCompleter: appStartedCompleter,
+            route: route,
+          );
+        },
         device,
         projectDirectory,
         enableHotReload,
-        cwd);
+      );
+    } finally {
+      fs.currentDirectory = cwd;
+    }
   }
 
   Future<AppInstance> launch(
-      ResidentRunner runner,
-      _RunOrAttach runOrAttach,
-      Device device,
-      String projectDirectory,
-      bool enableHotReload,
-      Directory cwd) async {
+    ResidentRunner runner,
+    _RunOrAttach runOrAttach,
+    Device device,
+    String projectDirectory,
+    bool enableHotReload,
+  ) async {
     final AppInstance app = new AppInstance(_getNewAppId(),
         runner: runner, logToStdout: daemon.logToStdout);
     _apps.add(app);
@@ -439,7 +449,6 @@ class AppDomain extends Domain {
           'trace': '$trace',
         });
       } finally {
-        fs.currentDirectory = cwd;
         _apps.remove(app);
       }
     });

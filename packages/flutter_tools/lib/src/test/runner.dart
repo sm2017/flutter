@@ -95,10 +95,11 @@ Future<int> runTests(
       fs.path.normalize(fs.path.absolute(PackageMap.globalPackagesPath));
 
   // Call package:test's main method in the appropriate directory.
-  final Directory saved = fs.currentDirectory;
+  final Directory oldDirectory = fs.currentDirectory;
   try {
     if (workDir != null) {
       printTrace('switching to directory $workDir to run tests');
+      // WARNING: THIS AFFECTS EVERY ISOLATE SYNCHRONOUSLY.
       fs.currentDirectory = workDir;
     }
 
@@ -110,6 +111,6 @@ Future<int> runTests(
 
     return exitCode;
   } finally {
-    fs.currentDirectory = saved;
+    fs.currentDirectory = oldDirectory;
   }
 }

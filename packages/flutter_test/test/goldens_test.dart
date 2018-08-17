@@ -40,7 +40,7 @@ void main() {
         createFile: (String path) => fs.file(path),
         createLink: (String path) => fs.link(path),
         getCurrentDirectory: () => fs.currentDirectory,
-        setCurrentDirectory: (String path) => fs.currentDirectory = path,
+        setCurrentDirectory: (String path) => fs.currentDirectory = path, // this is ok because we're using a MemoryFileSystem
         getSystemTempDirectory: () => fs.systemTempDirectory,
         stat: (String path) => fs.stat(path),
         statSync: (String path) => fs.statSync(path),
@@ -110,7 +110,7 @@ void main() {
             fs.file(fix('/foo/bar/golden.png'))
               ..createSync(recursive: true)
               ..writeAsBytesSync(_kExpectedBytes);
-            fs.currentDirectory = fix('/foo/bar');
+            fs.currentDirectory = fix('/foo/bar'); // this is ok because we're using a MemoryFileSystem
             comparator = new LocalFileComparator(Uri.parse('local_test.dart'), pathStyle: fs.path.style);
             final bool success = await doComparison('golden.png');
             expect(success, isTrue);
@@ -120,7 +120,7 @@ void main() {
             fs.file(fix('/foo/bar/baz/golden.png'))
               ..createSync(recursive: true)
               ..writeAsBytesSync(_kExpectedBytes);
-            fs.currentDirectory = fix('/foo/bar');
+            fs.currentDirectory = fix('/foo/bar'); // this is ok because we're using a MemoryFileSystem
             comparator = new LocalFileComparator(Uri.parse('local_test.dart'), pathStyle: fs.path.style);
             final bool success = await doComparison('baz/golden.png');
             expect(success, isTrue);

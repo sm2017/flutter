@@ -18,6 +18,25 @@ import 'src/common.dart';
 import 'src/context.dart';
 
 void main() {
+  // These tests do not use a memory file system because we want to ensure that
+  // asset bundles work correctly on Windows and Posix systems.
+  // DO NOT RELY ON SETTING THE CURRENT DIRECTORY. Doing so would affect all
+  // the other tests running at the same time. Instead, use filename() below.
+  Directory tempDir;
+
+  setUp(() async {
+    tempDir = fs.systemTempDirectory.createTempSync('flutter_asset_bundle_test.');
+  });
+
+  tearDown(() {
+    tryToDelete(tempDir);
+  });
+
+  /// Makes a path that points at relativePath inside the tempDir.
+  String filename(String relativePath) {
+    return fs.path.join(tempDir.path, relativePath);
+  }
+
   void writePubspecFile(String path, String name, {List<String> assets}) {
     String assetsSection;
     if (assets == null) {
@@ -55,7 +74,7 @@ $assetsSection
   }
 
   void writePackagesFile(String packages) {
-    fs.file('.packages')
+    fs.file(filename('.packages'))
       ..createSync()
       ..writeAsStringSync(packages);
   }
@@ -66,7 +85,7 @@ $assetsSection
     String expectedAssetManifest,
   ) async {
     final AssetBundle bundle = AssetBundleFactory.instance.createBundle();
-    await bundle.build(manifestPath: 'pubspec.yaml');
+    await bundle.build(manifestPath: filename('pubspec.yaml'));
 
     for (String packageName in packages) {
       for (String asset in assets) {
@@ -90,42 +109,26 @@ $assetsSection
       final String fullPath = fs.path.join(path, asset); // posix compatible
 
       final String normalizedFullPath = // posix and windows compatible over MemoryFileSystem
-      new Uri.file(
-          fullPath, windows: platform.isWindows)
-          .toFilePath(windows: platform.isWindows);
+      new Uri.file(fullPath, windows: platform.isWindows)
+        .toFilePath(windows: platform.isWindows);
 
+      print('$normalizedFullPath => $asset');
       fs.file(normalizedFullPath)
         ..createSync(recursive: true)
         ..writeAsStringSync(asset);
     }
   }
 
-  // These tests do not use a memory file system because we want to ensure that
-  // asset bundles work correctly on Windows and Posix systems.
-  Directory tempDir;
-  Directory oldCurrentDir;
-
-  setUp(() async {
-    tempDir = fs.systemTempDirectory.createTempSync('flutter_asset_bundle_test.');
-    oldCurrentDir = fs.currentDirectory;
-    fs.currentDirectory = tempDir;
-  });
-
-  tearDown(() {
-    fs.currentDirectory = oldCurrentDir;
-    tryToDelete(tempDir);
-  });
-
   group('AssetBundle assets from packages', () {
     testUsingContext('No assets are bundled when the package has no assets', () async {
       establishFlutterRoot();
 
-      writePubspecFile('pubspec.yaml', 'test');
-      writePackagesFile('test_package:p/p/lib/');
-      writePubspecFile('p/p/pubspec.yaml', 'test_package');
+      writePubspecFile(filename('pubspec.yaml'), 'test');
+      writePackagesFile(filename('test_package:p/p/lib/'));
+      writePubspecFile(filename('p/p/pubspec.yaml'), 'test_package');
 
       final AssetBundle bundle = AssetBundleFactory.instance.createBundle();
-      await bundle.build(manifestPath: 'pubspec.yaml');
+      await bundle.build(manifestPath: filename('pubspec.yaml'));
       expect(bundle.entries.length, 3); // LICENSE, AssetManifest, FontManifest
       const String expectedAssetManifest = '{}';
       expect(
@@ -141,15 +144,15 @@ $assetsSection
     testUsingContext('No assets are bundled when the package has an asset that is not listed', () async {
       establishFlutterRoot();
 
-      writePubspecFile('pubspec.yaml', 'test');
-      writePackagesFile('test_package:p/p/lib/');
-      writePubspecFile('p/p/pubspec.yaml', 'test_package');
+      writePubspecFile(filename('pubspec.yaml'), 'test');
+      writePackagesFile(filename('test_package:p/p/lib/'));
+      writePubspecFile(filename('p/p/pubspec.yaml'), 'test_package');
 
       final List<String> assets = <String>['a/foo'];
-      writeAssets('p/p/', assets);
+      writeAssets(filename('p/p/'), assets);
 
       final AssetBundle bundle = AssetBundleFactory.instance.createBundle();
-      await bundle.build(manifestPath: 'pubspec.yaml');
+      await bundle.build(manifestPath: filename('pubspec.yaml'));
       expect(bundle.entries.length, 3); // LICENSE, AssetManifest, FontManifest
       const String expectedAssetManifest = '{}';
       expect(
@@ -165,17 +168,17 @@ $assetsSection
     testUsingContext('One asset is bundled when the package has and lists one asset its pubspec', () async {
       establishFlutterRoot();
 
-      writePubspecFile('pubspec.yaml', 'test');
-      writePackagesFile('test_package:p/p/lib/');
+      writePubspecFile(filename('pubspec.yaml'), 'test');
+      writePackagesFile(filename('test_package:p/p/lib/'));
 
       final List<String> assets = <String>['a/foo'];
       writePubspecFile(
-        'p/p/pubspec.yaml',
+        filename('p/p/pubspec.yaml'),
         'test_package',
         assets: assets,
       );
 
-      writeAssets('p/p/', assets);
+      writeAssets(filename('p/p/'), assets);
 
       const String expectedAssetManifest = '{"packages/test_package/a/foo":'
           '["packages/test_package/a/foo"]}';
@@ -191,15 +194,15 @@ $assetsSection
 
       final List<String> assetEntries = <String>['packages/test_package/a/foo'];
       writePubspecFile(
-        'pubspec.yaml',
+        filename('pubspec.yaml'),
         'test',
         assets: assetEntries,
       );
       writePackagesFile('test_package:p/p/lib/');
-      writePubspecFile('p/p/pubspec.yaml', 'test_package');
+      writePubspecFile(filename('p/p/pubspec.yaml'), 'test_package');
 
       final List<String> assets = <String>['a/foo'];
-      writeAssets('p/p/lib/', assets);
+      writeAssets(filename('p/p/lib/'), assets);
 
       const String expectedAssetManifest = '{"packages/test_package/a/foo":'
           '["packages/test_package/a/foo"]}';
@@ -213,16 +216,16 @@ $assetsSection
     testUsingContext('One asset and its variant are bundled when the package has an asset and a variant, and lists the asset in its pubspec', () async {
       establishFlutterRoot();
 
-      writePubspecFile('pubspec.yaml', 'test');
+      writePubspecFile(filename('pubspec.yaml'), 'test');
       writePackagesFile('test_package:p/p/lib/');
       writePubspecFile(
-        'p/p/pubspec.yaml',
+        filename('p/p/pubspec.yaml'),
         'test_package',
         assets: <String>['a/foo'],
       );
 
       final List<String> assets = <String>['a/foo', 'a/v/foo'];
-      writeAssets('p/p/', assets);
+      writeAssets(filename('p/p/'), assets);
 
       const String expectedManifest = '{"packages/test_package/a/foo":'
           '["packages/test_package/a/foo","packages/test_package/a/v/foo"]}';
@@ -238,18 +241,18 @@ $assetsSection
       establishFlutterRoot();
 
       writePubspecFile(
-        'pubspec.yaml',
+        filename('pubspec.yaml'),
         'test',
         assets: <String>['packages/test_package/a/foo'],
       );
       writePackagesFile('test_package:p/p/lib/');
       writePubspecFile(
-        'p/p/pubspec.yaml',
+        filename('p/p/pubspec.yaml'),
         'test_package',
       );
 
       final List<String> assets = <String>['a/foo', 'a/v/foo'];
-      writeAssets('p/p/lib/', assets);
+      writeAssets(filename('p/p/lib/'), assets);
 
       const String expectedManifest = '{"packages/test_package/a/foo":'
           '["packages/test_package/a/foo","packages/test_package/a/v/foo"]}';
@@ -264,17 +267,17 @@ $assetsSection
     testUsingContext('Two assets are bundled when the package has and lists two assets in its pubspec', () async {
       establishFlutterRoot();
 
-      writePubspecFile('pubspec.yaml', 'test');
+      writePubspecFile(filename('pubspec.yaml'), 'test');
       writePackagesFile('test_package:p/p/lib/');
 
       final List<String> assets = <String>['a/foo', 'a/bar'];
       writePubspecFile(
-        'p/p/pubspec.yaml',
+        filename('p/p/pubspec.yaml'),
         'test_package',
         assets: assets,
       );
 
-      writeAssets('p/p/', assets);
+      writeAssets(filename('p/p/'), assets);
       const String expectedAssetManifest =
           '{"packages/test_package/a/bar":["packages/test_package/a/bar"],'
           '"packages/test_package/a/foo":["packages/test_package/a/foo"]}';
@@ -294,7 +297,7 @@ $assetsSection
         'packages/test_package/a/bar',
       ];
       writePubspecFile(
-        'pubspec.yaml',
+        filename('pubspec.yaml'),
         'test',
          assets: assetEntries,
       );
@@ -302,11 +305,11 @@ $assetsSection
 
       final List<String> assets = <String>['a/foo', 'a/bar'];
       writePubspecFile(
-        'p/p/pubspec.yaml',
+        filename('p/p/pubspec.yaml'),
         'test_package',
       );
 
-      writeAssets('p/p/lib/', assets);
+      writeAssets(filename('p/p/lib/'), assets);
       const String expectedAssetManifest =
           '{"packages/test_package/a/bar":["packages/test_package/a/bar"],'
           '"packages/test_package/a/foo":["packages/test_package/a/foo"]}';
@@ -322,24 +325,24 @@ $assetsSection
       establishFlutterRoot();
 
       writePubspecFile(
-        'pubspec.yaml',
+        filename('pubspec.yaml'),
         'test',
       );
       writePackagesFile('test_package:p/p/lib/\ntest_package2:p2/p/lib/');
       writePubspecFile(
-        'p/p/pubspec.yaml',
+        filename('p/p/pubspec.yaml'),
         'test_package',
         assets: <String>['a/foo'],
       );
       writePubspecFile(
-        'p2/p/pubspec.yaml',
+        filename('p2/p/pubspec.yaml'),
         'test_package2',
         assets: <String>['a/foo'],
       );
 
       final List<String> assets = <String>['a/foo', 'a/v/foo'];
-      writeAssets('p/p/', assets);
-      writeAssets('p2/p/', assets);
+      writeAssets(filename('p/p/'), assets);
+      writeAssets(filename('p2/p/'), assets);
 
       const String expectedAssetManifest =
           '{"packages/test_package/a/foo":'
@@ -362,23 +365,23 @@ $assetsSection
         'packages/test_package2/a/foo',
       ];
       writePubspecFile(
-        'pubspec.yaml',
+        filename('pubspec.yaml'),
         'test',
         assets: assetEntries,
       );
       writePackagesFile('test_package:p/p/lib/\ntest_package2:p2/p/lib/');
       writePubspecFile(
-        'p/p/pubspec.yaml',
+        filename('p/p/pubspec.yaml'),
         'test_package',
       );
       writePubspecFile(
-        'p2/p/pubspec.yaml',
+        filename('p2/p/pubspec.yaml'),
         'test_package2',
       );
 
       final List<String> assets = <String>['a/foo', 'a/v/foo'];
-      writeAssets('p/p/lib/', assets);
-      writeAssets('p2/p/lib/', assets);
+      writeAssets(filename('p/p/lib/'), assets);
+      writeAssets(filename('p2/p/lib/'), assets);
 
       const String expectedAssetManifest =
           '{"packages/test_package/a/foo":'
@@ -396,22 +399,22 @@ $assetsSection
     testUsingContext('One asset is bundled when the app depends on a package, listing in its pubspec an asset from another package', () async {
       establishFlutterRoot();
       writePubspecFile(
-        'pubspec.yaml',
+        filename('pubspec.yaml'),
         'test',
       );
       writePackagesFile('test_package:p/p/lib/\ntest_package2:p2/p/lib/');
       writePubspecFile(
-        'p/p/pubspec.yaml',
+        filename('p/p/pubspec.yaml'),
         'test_package',
         assets: <String>['packages/test_package2/a/foo'],
       );
       writePubspecFile(
-        'p2/p/pubspec.yaml',
+        filename('p2/p/pubspec.yaml'),
         'test_package2',
       );
 
       final List<String> assets = <String>['a/foo', 'a/v/foo'];
-      writeAssets('p2/p/lib/', assets);
+      writeAssets(filename('p2/p/lib/'), assets);
 
       const String expectedAssetManifest =
           '{"packages/test_package2/a/foo":'
@@ -428,17 +431,17 @@ $assetsSection
   testUsingContext('Asset paths can contain URL reserved characters', () async {
     establishFlutterRoot();
 
-    writePubspecFile('pubspec.yaml', 'test');
+    writePubspecFile(filename('pubspec.yaml'), 'test');
     writePackagesFile('test_package:p/p/lib/');
 
     final List<String> assets = <String>['a/foo', 'a/foo[x]'];
     writePubspecFile(
-      'p/p/pubspec.yaml',
+      filename('p/p/pubspec.yaml'),
       'test_package',
       assets: assets,
     );
 
-    writeAssets('p/p/', assets);
+    writeAssets(filename('p/p/'), assets);
     const String expectedAssetManifest =
         '{"packages/test_package/a/foo":["packages/test_package/a/foo"],'
         '"packages/test_package/a/foo%5Bx%5D":["packages/test_package/a/foo%5Bx%5D"]}';
@@ -455,19 +458,19 @@ $assetsSection
         'Two assets are bundled when scanning their directory', () async {
       establishFlutterRoot();
 
-      writePubspecFile('pubspec.yaml', 'test');
+      writePubspecFile(filename('pubspec.yaml'), 'test');
       writePackagesFile('test_package:p/p/lib/');
 
       final List<String> assetsOnDisk = <String>['a/foo', 'a/bar'];
       final List<String> assetsOnManifest = <String>['a/'];
 
       writePubspecFile(
-        'p/p/pubspec.yaml',
+        filename('p/p/pubspec.yaml'),
         'test_package',
         assets: assetsOnManifest,
       );
 
-      writeAssets('p/p/', assetsOnDisk);
+      writeAssets(filename('p/p/'), assetsOnDisk);
       const String expectedAssetManifest =
           '{"packages/test_package/a/bar":["packages/test_package/a/bar"],'
           '"packages/test_package/a/foo":["packages/test_package/a/foo"]}';
@@ -483,19 +486,19 @@ $assetsSection
         'Two assets are bundled when listing one and scanning second directory', () async {
       establishFlutterRoot();
 
-      writePubspecFile('pubspec.yaml', 'test');
+      writePubspecFile(filename('pubspec.yaml'), 'test');
       writePackagesFile('test_package:p/p/lib/');
 
       final List<String> assetsOnDisk = <String>['a/foo', 'abc/bar'];
       final List<String> assetOnManifest = <String>['a/foo', 'abc/'];
 
       writePubspecFile(
-        'p/p/pubspec.yaml',
+        filename('p/p/pubspec.yaml'),
         'test_package',
         assets: assetOnManifest,
       );
 
-      writeAssets('p/p/', assetsOnDisk);
+      writeAssets(filename('p/p/'), assetsOnDisk);
       const String expectedAssetManifest =
           '{"packages/test_package/abc/bar":["packages/test_package/abc/bar"],'
           '"packages/test_package/a/foo":["packages/test_package/a/foo"]}';
@@ -511,22 +514,22 @@ $assetsSection
         'One asset is bundled with variant, scanning wrong directory', () async {
       establishFlutterRoot();
 
-      writePubspecFile('pubspec.yaml', 'test');
+      writePubspecFile(filename('pubspec.yaml'), 'test');
       writePackagesFile('test_package:p/p/lib/');
 
       final List<String> assetsOnDisk = <String>['a/foo','a/b/foo','a/bar'];
       final List<String> assetOnManifest = <String>['a','a/bar']; // can't list 'a' as asset, should be 'a/'
 
       writePubspecFile(
-        'p/p/pubspec.yaml',
+        filename('p/p/pubspec.yaml'),
         'test_package',
         assets: assetOnManifest,
       );
 
-      writeAssets('p/p/', assetsOnDisk);
+      writeAssets(filename('p/p/'), assetsOnDisk);
 
       final AssetBundle bundle = AssetBundleFactory.instance.createBundle();
-      await bundle.build(manifestPath: 'pubspec.yaml');
+      await bundle.build(manifestPath: filename('pubspec.yaml'));
       assert(bundle.entries['AssetManifest.json'] == null,'Invalid pubspec.yaml should not generate AssetManifest.json'  );
     });
   });
@@ -551,11 +554,8 @@ $assetsSection
     }
 
     void testUsingContextAndFs(String description, dynamic testMethod(),) {
-      final FileSystem windowsFs = new MemoryFileSystem(
-          style: FileSystemStyle.windows);
-
-      final FileSystem posixFs = new MemoryFileSystem(
-          style: FileSystemStyle.posix);
+      final FileSystem windowsFs = new MemoryFileSystem(style: FileSystemStyle.windows);
+      final FileSystem posixFs = new MemoryFileSystem(style: FileSystemStyle.posix);
 
       const String _kFlutterRoot = '/flutter/flutter';
       establishFlutterRoot();
@@ -592,23 +592,22 @@ $assetsSection
       });
     }
 
-    testUsingContextAndFs(
-        'One asset is bundled with variant, scanning directory', () async {
+    testUsingContextAndFs('One asset is bundled with variant, scanning directory', () async {
       establishFlutterRoot();
 
-      writePubspecFile('pubspec.yaml', 'test');
+      writePubspecFile(filename('pubspec.yaml'), 'test');
       writePackagesFile('test_package:p/p/lib/');
 
       final List<String> assetsOnDisk = <String>['a/foo','a/b/foo'];
       final List<String> assetOnManifest = <String>['a/',];
 
       writePubspecFile(
-        'p/p/pubspec.yaml',
+        filename('p/p/pubspec.yaml'),
         'test_package',
         assets: assetOnManifest,
       );
 
-      writeAssets('p/p/', assetsOnDisk);
+      writeAssets(filename('p/p/'), assetsOnDisk);
       const String expectedAssetManifest =
           '{"packages/test_package/a/foo":["packages/test_package/a/foo","packages/test_package/a/b/foo"]}';
 
@@ -619,23 +618,22 @@ $assetsSection
       );
     });
 
-    testUsingContextAndFs(
-        'No asset is bundled with variant, no assets or directories are listed', () async {
+    testUsingContextAndFs('No asset is bundled with variant, no assets or directories are listed', () async {
       establishFlutterRoot();
 
-      writePubspecFile('pubspec.yaml', 'test');
+      writePubspecFile(filename('pubspec.yaml'), 'test');
       writePackagesFile('test_package:p/p/lib/');
 
       final List<String> assetsOnDisk = <String>['a/foo', 'a/b/foo'];
       final List<String> assetOnManifest = <String>[];
 
       writePubspecFile(
-        'p/p/pubspec.yaml',
+        filename('p/p/pubspec.yaml'),
         'test_package',
         assets: assetOnManifest,
       );
 
-      writeAssets('p/p/', assetsOnDisk);
+      writeAssets(filename('p/p/'), assetsOnDisk);
       const String expectedAssetManifest = '{}';
 
       await buildAndVerifyAssets(
@@ -645,17 +643,16 @@ $assetsSection
       );
     });
 
-    testUsingContextAndFs(
-        'Expect error generating manifest, wrong non-existing directory is listed', () async {
+    testUsingContextAndFs('Expect error generating manifest, wrong non-existing directory is listed', () async {
       establishFlutterRoot();
 
-      writePubspecFile('pubspec.yaml', 'test');
+      writePubspecFile(filename('pubspec.yaml'), 'test');
       writePackagesFile('test_package:p/p/lib/');
 
       final List<String> assetOnManifest = <String>['c/'];
 
       writePubspecFile(
-        'p/p/pubspec.yaml',
+        filename('p/p/pubspec.yaml'),
         'test_package',
         assets: assetOnManifest,
       );
