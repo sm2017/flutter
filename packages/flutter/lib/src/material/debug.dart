@@ -38,6 +38,7 @@ bool debugCheckHasMaterial(BuildContext context) {
         'there be a Material widget in the tree above them.'
       );
       message.writeln(
+        '${FlutterError.hint}'
         'To introduce a Material widget, you can either directly '
         'include one, or use a widget that contains Material itself, '
         'such as a Card, Dialog, Drawer, or Scaffold.'

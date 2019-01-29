@@ -775,6 +775,41 @@ abstract class DiagnosticsNode {
     return data;
   }
 
+  /// Returns a marker that can be inserted into a string to uniquely identify
+  /// the actual object being described in a string.
+  String get _code {
+    if (_assignedCode != null) {
+      _nodesToCodes.remove(this); // move us to the end of the LRU list.
+    } else {
+      _assignedCode = _nextCode;
+      if (_codesToNodes.containsKey(_assignedCode)) {
+        final DiagnosticsNode old = _codesToNodes.removeKey(_assignedCode);
+        _nodesToCodes.removeKey(old);
+        old._assignedCode = null;
+      }
+      _nextCode += 1;
+      if (_nextCode == 0xF800)
+        _nextCode = 0xF700;
+      _codesToNodes[_assignedCode] = this;
+    }
+    _nodesToCodes[this] = _assignedCode;
+    return String.fromCharCode(_assignedCode);
+  }
+  int _assignedCode;
+  static Map<int, DiagnosticsNode> _codesToNodes;
+  static Map<DiagnosticsNode, int> _nodesToCodes;
+  static int _nextCode = 0xF700;
+  static const _endCode = '\xF800';
+
+  /// Returns the [DiagnosticsNode] that was last assigned to the given
+  /// [code].
+  ///
+  /// This can be used by, e.g., the inspector to determine the which object is
+  /// referenced by an error message.
+  static DiagnosticsNode fromCode(int code) {
+    return _codesToNodes[code];
+  }
+
   /// Returns a string representation of this diagnostic that is compatible with
   /// the style of the parent if the node is not the root.
   ///
@@ -799,8 +834,8 @@ abstract class DiagnosticsNode {
     if (name == null || name.isEmpty || !showName)
       return description;
 
-    return description.contains('\n') ? '$name$_separator\n$description'
-                                      : '$name$_separator $description';
+    final String break = description.contains('\n') ? '\n' : ' ';
+    return '$_code$name$_endCode$_separator$break$description';
   }
 
   /// Returns a configuration specifying how this object should be rendered
@@ -878,10 +913,10 @@ abstract class DiagnosticsNode {
     final String description = toDescription(parentConfiguration: parentConfiguration);
     if (description == null || description.isEmpty) {
       if (showName && name != null)
-        builder.write(name);
+        builder.write('$_code$name$_endCode');
     } else {
       if (name != null && name.isNotEmpty && showName) {
-        builder.write(name);
+        builder.write('$_code$name$_endCode');
         if (showSeparator)
           builder.write(config.afterName);
 

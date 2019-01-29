@@ -187,6 +187,16 @@ class FlutterError extends AssertionError {
   /// relevant to debugging the error.
   FlutterError(String message) : super(message);
 
+  /// Indicates that the subsequent paragraph in an error message is a hint.
+  ///
+  /// Hints may be coloured in IDEs.
+  ///
+  /// See also:
+  ///
+  ///  * [debugPrint], which knows how to strip annotations from strings
+  ///    before printing them.
+  static const hint = '\xF801'; // hint region ends with U+000A
+
   /// The message associated with this error.
   ///
   /// The message may have newlines in it. The first line should be a terse
@@ -206,7 +216,7 @@ class FlutterError extends AssertionError {
   String get message => super.message;
 
   @override
-  String toString() => message;
+  String toString() => message.replaceAll(_markersPattern, '');
 
   /// Called whenever the Flutter framework catches an error.
   ///
